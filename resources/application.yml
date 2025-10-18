@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: hrms-auth-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hrms
+    username: hrms_user
+    password: hrms_password
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  sql:
+    init:
+      mode: always
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: "mySuperSecretKeyThatIsAtLeast32CharactersLong123!"
+    access-token-ttl: 15m
+    refresh-token-ttl: 30d
+    issuer: "hrms-suite"
+  token:
+    access-token-ttl: 15m
+    refresh-token-ttl: 30d
+    token-rotation-enabled: true
+    max-refresh-tokens-per-user: 5
+
+logging:
+  level:
+    com.hrms.auth: DEBUG
+    org.springframework.security: DEBUG

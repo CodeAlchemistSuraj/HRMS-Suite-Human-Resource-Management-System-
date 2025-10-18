@@ -1,0 +1,1290 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>HRMS Module 1: Authentication & Identity Management - Complete Technical Bible.md</title><style></style></head><body id="preview">
+<p class="has-line-data" data-line-start="0" data-line-end="1"><strong>HRMS Module 1: Authentication &amp; Identity Management - Complete Technical Bible</strong></p>
+<p class="has-line-data" data-line-start="2" data-line-end="3"><strong>📖 Table of Contents</strong></p>
+<ol>
+<li class="has-line-data" data-line-start="3" data-line-end="4"><a href="architecture-overview">Architecture Overview</a></li>
+<li class="has-line-data" data-line-start="4" data-line-end="5"><a href="database-design--schema">Database Design &amp; Schema</a></li>
+<li class="has-line-data" data-line-start="5" data-line-end="6"><a href="entity-layer-deep-dive">Entity Layer Deep Dive</a></li>
+<li class="has-line-data" data-line-start="6" data-line-end="7"><a href="repository-layer-analysis">Repository Layer Analysis</a></li>
+<li class="has-line-data" data-line-start="7" data-line-end="8"><a href="service-layer-implementation">Service Layer Implementation</a></li>
+<li class="has-line-data" data-line-start="8" data-line-end="9"><a href="security-infrastructure">Security Infrastructure</a></li>
+<li class="has-line-data" data-line-start="9" data-line-end="10"><a href="controller-layer--api-design">Controller Layer &amp; API Design</a></li>
+<li class="has-line-data" data-line-start="10" data-line-end="11"><a href="event-driven-architecture">Event-Driven Architecture</a></li>
+<li class="has-line-data" data-line-start="11" data-line-end="12"><a href="utility-components">Utility Components</a></li>
+<li class="has-line-data" data-line-start="12" data-line-end="13"><a href="configuration-management">Configuration Management</a></li>
+<li class="has-line-data" data-line-start="13" data-line-end="14"><a href="complete-data-flow">Complete Data Flow</a></li>
+<li class="has-line-data" data-line-start="14" data-line-end="16"><a href="security-considerations">Security Considerations</a></li>
+</ol>
+<hr>
+<p class="has-line-data" data-line-start="18" data-line-end="19"><strong>🏗️ Architecture Overview</strong></p>
+<p class="has-line-data" data-line-start="20" data-line-end="22"><strong>Microservice Structure</strong><br>
+Module 1 follows a <strong>strictly layered architecture</strong> with clear separation of concerns:</p>
+<pre><code class="has-line-data" data-line-start="24" data-line-end="49">┌─────────────────────────────────────────────────────────────┐
+│                    PRESENTATION LAYER                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ AuthController │  │ UserAdminController │  │ RoleController │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     BUSINESS LAYER                         │
+│  ┌───────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
+│  │ AuthService │  │ UserService │  │ RoleService │  │ MfaService  │  │
+│  └───────────┘  └──────────┘  └──────────┘  └─────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    PERSISTENCE LAYER                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ UserRepository │  │ RoleRepository │  │ RefreshTokenRepo │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     DOMAIN LAYER                           │
+│  ┌────────┐  ┌───────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │  User  │  │ Role  │  │ RefreshToken │  │ AuthAuditLog │  │
+│  └────────┘  └───────┘  └──────────────┘  └──────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+</code></pre>
+<p class="has-line-data" data-line-start="50" data-line-end="51"><strong>Technology Stack</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="51" data-line-end="52"><strong>Framework</strong>: Spring Boot 3.x + Spring Security 6</li>
+<li class="has-line-data" data-line-start="52" data-line-end="53"><strong>Database</strong>: PostgreSQL with UUID primary keys</li>
+<li class="has-line-data" data-line-start="53" data-line-end="54"><strong>Authentication</strong>: JWT (JSON Web Tokens)</li>
+<li class="has-line-data" data-line-start="54" data-line-end="55"><strong>Password Hashing</strong>: Argon2 + BCrypt</li>
+<li class="has-line-data" data-line-start="55" data-line-end="56"><strong>MFA</strong>: TOTP (Time-based One-Time Password)</li>
+<li class="has-line-data" data-line-start="56" data-line-end="57"><strong>API Documentation</strong>: OpenAPI 3 (Ready for Swagger)</li>
+<li class="has-line-data" data-line-start="57" data-line-end="59"><strong>Build Tool</strong>: Maven/Gradle ready structure</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="61" data-line-end="62"><strong>🗄️ Database Design &amp; Schema</strong></p>
+<p class="has-line-data" data-line-start="63" data-line-end="64"><strong>Core Tables &amp; Relationships</strong></p>
+<p class="has-line-data" data-line-start="65" data-line-end="66"><strong>1. Users Table - Central Identity Store</strong></p>
+<pre><code class="has-line-data" data-line-start="67" data-line-end="83" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> <span class="hljs-keyword">users</span> (
+    <span class="hljs-keyword">id</span> <span class="hljs-keyword">UUID</span> PRIMARY <span class="hljs-keyword">KEY</span> <span class="hljs-keyword">DEFAULT</span> uuid_generate_v4(),
+    username <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">100</span>) <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">UNIQUE</span>,          <span class="hljs-comment">-- Case-insensitive login</span>
+    email <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">150</span>) <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">UNIQUE</span>,             <span class="hljs-comment">-- Unique email constraint</span>
+    password_hash <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">255</span>),                     <span class="hljs-comment">-- Nullable for SSO users</span>
+    <span class="hljs-keyword">status</span> user_status <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-string">'ACTIVE'</span>,   <span class="hljs-comment">-- ACTIVE, DISABLED, LOCKED</span>
+    employee_id <span class="hljs-keyword">UUID</span> <span class="hljs-literal">NULL</span>,                          <span class="hljs-comment">-- FK to Employee module</span>
+    mfa_method mfa_method <span class="hljs-keyword">DEFAULT</span> <span class="hljs-string">'NONE'</span>,          <span class="hljs-comment">-- TOTP, SMS, EMAIL, NONE</span>
+    mfa_secret <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">255</span>),                       <span class="hljs-comment">-- Encrypted TOTP secret</span>
+    failed_login_count <span class="hljs-built_in">INT</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-number">0</span>,              <span class="hljs-comment">-- Security tracking</span>
+    last_failed_login_at <span class="hljs-keyword">TIMESTAMP</span>,                <span class="hljs-comment">-- Security timestamp</span>
+    last_login_at <span class="hljs-keyword">TIMESTAMP</span>,                       <span class="hljs-comment">-- Activity tracking</span>
+    created_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>,
+    updated_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>
+);</span>
+</code></pre>
+<p class="has-line-data" data-line-start="84" data-line-end="85"><strong>Business Logic Implications:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="85" data-line-end="86"><code>password_hash</code> is <strong>nullable</strong> to support SSO-only users</li>
+<li class="has-line-data" data-line-start="86" data-line-end="87"><code>employee_id</code> creates <strong>loose coupling</strong> with Employee module</li>
+<li class="has-line-data" data-line-start="87" data-line-end="88"><code>failed_login_count</code> enables <strong>account lockout</strong> after threshold</li>
+<li class="has-line-data" data-line-start="88" data-line-end="90"><code>mfa_secret</code> is <strong>encrypted at application level</strong> before storage</li>
+</ul>
+<p class="has-line-data" data-line-start="90" data-line-end="91"><strong>2. Roles Table - RBAC Foundation</strong></p>
+<pre><code class="has-line-data" data-line-start="92" data-line-end="100" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> <span class="hljs-keyword">roles</span> (
+    <span class="hljs-keyword">id</span> <span class="hljs-keyword">UUID</span> PRIMARY <span class="hljs-keyword">KEY</span> <span class="hljs-keyword">DEFAULT</span> uuid_generate_v4(),
+    <span class="hljs-keyword">name</span> role_name <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">UNIQUE</span>,  <span class="hljs-comment">-- ENUM: ROLE_ADMIN, ROLE_HR, etc.</span>
+    description <span class="hljs-built_in">TEXT</span>,
+    created_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>,
+    updated_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>
+);</span>
+</code></pre>
+<p class="has-line-data" data-line-start="101" data-line-end="102"><strong>Pre-defined Roles:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="102" data-line-end="103"><code>ROLE_ADMIN</code> - Full system access</li>
+<li class="has-line-data" data-line-start="103" data-line-end="104"><code>ROLE_HR</code> - Human Resources management</li>
+<li class="has-line-data" data-line-start="104" data-line-end="105"><code>ROLE_MANAGER</code> - Team management</li>
+<li class="has-line-data" data-line-start="105" data-line-end="106"><code>ROLE_EMPLOYEE</code> - Basic user access</li>
+<li class="has-line-data" data-line-start="106" data-line-end="107"><code>ROLE_FINANCE</code> - Financial data access</li>
+<li class="has-line-data" data-line-start="107" data-line-end="108"><code>ROLE_AUDITOR</code> - Read-only audit access</li>
+<li class="has-line-data" data-line-start="108" data-line-end="110"><code>ROLE_SYSTEM</code> - Service-to-service communication</li>
+</ul>
+<p class="has-line-data" data-line-start="110" data-line-end="111"><strong>3. User-Roles Junction Table - Many-to-Many with History</strong></p>
+<pre><code class="has-line-data" data-line-start="112" data-line-end="121" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> user_roles (
+    <span class="hljs-keyword">id</span> <span class="hljs-keyword">UUID</span> PRIMARY <span class="hljs-keyword">KEY</span> <span class="hljs-keyword">DEFAULT</span> uuid_generate_v4(),
+    user_id <span class="hljs-keyword">UUID</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">REFERENCES</span> <span class="hljs-keyword">users</span>(<span class="hljs-keyword">id</span>) <span class="hljs-keyword">ON</span> <span class="hljs-keyword">DELETE</span> <span class="hljs-keyword">CASCADE</span>,
+    role_id <span class="hljs-keyword">UUID</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">REFERENCES</span> <span class="hljs-keyword">roles</span>(<span class="hljs-keyword">id</span>) <span class="hljs-keyword">ON</span> <span class="hljs-keyword">DELETE</span> <span class="hljs-keyword">CASCADE</span>,
+    assigned_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>,
+    revoked_at <span class="hljs-keyword">TIMESTAMP</span>,                          <span class="hljs-comment">-- Soft delete for audit</span>
+    <span class="hljs-keyword">UNIQUE</span>(user_id, role_id)                       <span class="hljs-comment">-- Prevent duplicate assignments</span>
+);</span>
+</code></pre>
+<p class="has-line-data" data-line-start="122" data-line-end="123"><strong>Audit Trail Design:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="123" data-line-end="124"><code>assigned_at</code> tracks when role was granted</li>
+<li class="has-line-data" data-line-start="124" data-line-end="125"><code>revoked_at</code> enables <strong>soft deletion</strong> and audit history</li>
+<li class="has-line-data" data-line-start="125" data-line-end="127">Unique constraint prevents <strong>role duplication</strong></li>
+</ul>
+<p class="has-line-data" data-line-start="127" data-line-end="128"><strong>4. Refresh Tokens Table - Session Management</strong></p>
+<pre><code class="has-line-data" data-line-start="129" data-line-end="140" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> refresh_tokens (
+    <span class="hljs-keyword">id</span> <span class="hljs-keyword">UUID</span> PRIMARY <span class="hljs-keyword">KEY</span> <span class="hljs-keyword">DEFAULT</span> uuid_generate_v4(),
+    user_id <span class="hljs-keyword">UUID</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">REFERENCES</span> <span class="hljs-keyword">users</span>(<span class="hljs-keyword">id</span>) <span class="hljs-keyword">ON</span> <span class="hljs-keyword">DELETE</span> <span class="hljs-keyword">CASCADE</span>,
+    token_hash <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">255</span>) <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span>,              <span class="hljs-comment">-- Hashed token value</span>
+    issued_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>,
+    expires_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span>,                 <span class="hljs-comment">-- Absolute expiry</span>
+    revoked_at <span class="hljs-keyword">TIMESTAMP</span>,                          <span class="hljs-comment">-- Manual revocation</span>
+    ip_address <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">45</span>),                        <span class="hljs-comment">-- IPv4/IPv6 support</span>
+    user_agent <span class="hljs-built_in">TEXT</span>                                <span class="hljs-comment">-- Browser/device info</span>
+);</span>
+</code></pre>
+<p class="has-line-data" data-line-start="141" data-line-end="142"><strong>Security Features:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="142" data-line-end="143"><strong>Token Hashing</strong>: Raw tokens never stored in database</li>
+<li class="has-line-data" data-line-start="143" data-line-end="144"><strong>IP Tracking</strong>: Geographic and device session tracking</li>
+<li class="has-line-data" data-line-start="144" data-line-end="146"><strong>Cascade Delete</strong>: Automatic cleanup when user is deleted</li>
+</ul>
+<p class="has-line-data" data-line-start="146" data-line-end="147"><strong>5. Auth Audit Log Table - Compliance &amp; Security</strong></p>
+<pre><code class="has-line-data" data-line-start="148" data-line-end="158" class="language-sql"><span class="hljs-operator"><span class="hljs-keyword">CREATE</span> <span class="hljs-keyword">TABLE</span> auth_audit_log (
+    <span class="hljs-keyword">id</span> <span class="hljs-keyword">UUID</span> PRIMARY <span class="hljs-keyword">KEY</span> <span class="hljs-keyword">DEFAULT</span> uuid_generate_v4(),
+    actor_user_id <span class="hljs-keyword">UUID</span> <span class="hljs-keyword">REFERENCES</span> <span class="hljs-keyword">users</span>(<span class="hljs-keyword">id</span>),       <span class="hljs-comment">-- Null for system actions</span>
+    <span class="hljs-keyword">action</span> <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">50</span>) <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span>,                   <span class="hljs-comment">-- LOGIN, LOGOUT, etc.</span>
+    <span class="hljs-keyword">status</span> <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">20</span>),                            <span class="hljs-comment">-- SUCCESS/FAILURE</span>
+    ip_address <span class="hljs-built_in">VARCHAR</span>(<span class="hljs-number">45</span>),
+    meta JSONB,                                    <span class="hljs-comment">-- Flexible metadata storage</span>
+    created_at <span class="hljs-keyword">TIMESTAMP</span> <span class="hljs-keyword">NOT</span> <span class="hljs-literal">NULL</span> <span class="hljs-keyword">DEFAULT</span> <span class="hljs-keyword">CURRENT_TIMESTAMP</span>
+);</span>
+</code></pre>
+<p class="has-line-data" data-line-start="159" data-line-end="160"><strong>Audit Actions Tracked:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="160" data-line-end="161"><code>LOGIN</code>, <code>LOGIN_FAILED</code>, <code>LOGOUT</code></li>
+<li class="has-line-data" data-line-start="161" data-line-end="162"><code>PASSWORD_RESET</code>, <code>TOKEN_REFRESH</code>, <code>TOKEN_REVOKE</code></li>
+<li class="has-line-data" data-line-start="162" data-line-end="164"><code>MFA_ENABLED</code>, <code>MFA_DISABLED</code></li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="166" data-line-end="167"><strong>👤 Entity Layer Deep Dive</strong></p>
+<p class="has-line-data" data-line-start="168" data-line-end="169"><strong>User Entity - The Core Identity</strong></p>
+<pre><code class="has-line-data" data-line-start="171" data-line-end="198" class="language-java"><span class="hljs-annotation">@Entity</span>
+<span class="hljs-annotation">@Table</span>(name = <span class="hljs-string">"users"</span>)
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">User</span> </span>{
+    <span class="hljs-comment">// Core Identification</span>
+    <span class="hljs-keyword">private</span> UUID id;
+    <span class="hljs-keyword">private</span> String username;      <span class="hljs-comment">// Login identifier</span>
+    <span class="hljs-keyword">private</span> String email;         <span class="hljs-comment">// Communication channel</span>
+    
+    <span class="hljs-comment">// Security Attributes</span>
+    <span class="hljs-keyword">private</span> String passwordHash;  <span class="hljs-comment">// Nullable for SSO</span>
+    <span class="hljs-keyword">private</span> UserStatus status;    <span class="hljs-comment">// ACTIVE, DISABLED, LOCKED</span>
+    <span class="hljs-keyword">private</span> MfaMethod mfaMethod;  <span class="hljs-comment">// Multi-factor method</span>
+    <span class="hljs-keyword">private</span> String mfaSecret;     <span class="hljs-comment">// Encrypted secret</span>
+    
+    <span class="hljs-comment">// Security Tracking</span>
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">int</span> failedLoginCount;
+    <span class="hljs-keyword">private</span> Instant lastFailedLoginAt;
+    <span class="hljs-keyword">private</span> Instant lastLoginAt;
+    
+    <span class="hljs-comment">// Integration</span>
+    <span class="hljs-keyword">private</span> UUID employeeId;      <span class="hljs-comment">// Cross-module reference</span>
+    
+    <span class="hljs-comment">// Timestamps</span>
+    <span class="hljs-keyword">private</span> Instant createdAt;
+    <span class="hljs-keyword">private</span> Instant updatedAt;
+}
+</code></pre>
+<p class="has-line-data" data-line-start="199" data-line-end="200"><strong>Business Logic Methods:</strong></p>
+<p class="has-line-data" data-line-start="201" data-line-end="202"><strong>1. Password Validation</strong></p>
+<pre><code class="has-line-data" data-line-start="203" data-line-end="208" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">checkPassword</span><span class="hljs-params">(String plainPassword)</span> </span>{
+    <span class="hljs-comment">// Delegates to PasswordEncoderUtil for secure comparison</span>
+    <span class="hljs-keyword">return</span> passwordEncoder.matches(plainPassword, <span class="hljs-keyword">this</span>.passwordHash);
+}
+</code></pre>
+<p class="has-line-data" data-line-start="209" data-line-end="210"><strong>Security Flow:</strong></p>
+<ol>
+<li class="has-line-data" data-line-start="210" data-line-end="211"><strong>Input</strong>: Plain text password from login request</li>
+<li class="has-line-data" data-line-start="211" data-line-end="212"><strong>Processing</strong>: Argon2/BCrypt comparison with stored hash</li>
+<li class="has-line-data" data-line-start="212" data-line-end="214"><strong>Output</strong>: Boolean result without exposing timing attacks</li>
+</ol>
+<p class="has-line-data" data-line-start="214" data-line-end="215"><strong>2. Failed Login Tracking</strong></p>
+<pre><code class="has-line-data" data-line-start="216" data-line-end="226" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">incrementFailedLogin</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">this</span>.failedLoginCount++;
+    <span class="hljs-keyword">this</span>.lastFailedLoginAt = Instant.now();
+    
+    <span class="hljs-comment">// Auto-lock after threshold (configurable)</span>
+    <span class="hljs-keyword">if</span> (<span class="hljs-keyword">this</span>.failedLoginCount &gt;= MAX_FAILED_ATTEMPTS) {
+        <span class="hljs-keyword">this</span>.lock();
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="227" data-line-end="228"><strong>Security Logic:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="228" data-line-end="229"><strong>In-memory counter</strong> for performance</li>
+<li class="has-line-data" data-line-start="229" data-line-end="230"><strong>Automatic lockout</strong> after configurable threshold</li>
+<li class="has-line-data" data-line-start="230" data-line-end="232"><strong>Timestamp tracking</strong> for security monitoring</li>
+</ul>
+<p class="has-line-data" data-line-start="232" data-line-end="233"><strong>3. MFA Management</strong></p>
+<pre><code class="has-line-data" data-line-start="234" data-line-end="239" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">setMfa</span><span class="hljs-params">(MfaMethod method, String secret)</span> </span>{
+    <span class="hljs-keyword">this</span>.mfaMethod = method;
+    <span class="hljs-keyword">this</span>.mfaSecret = encryptSecret(secret); <span class="hljs-comment">// Application-level encryption</span>
+}
+</code></pre>
+<p class="has-line-data" data-line-start="240" data-line-end="241"><strong>Encryption Strategy:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="241" data-line-end="242"><strong>TOTP secrets</strong> encrypted before database storage</li>
+<li class="has-line-data" data-line-start="242" data-line-end="243"><strong>Encryption key</strong> managed separately from database</li>
+<li class="has-line-data" data-line-start="243" data-line-end="245"><strong>No plaintext secrets</strong> in logs or memory dumps</li>
+</ul>
+<p class="has-line-data" data-line-start="245" data-line-end="246"><strong>RefreshToken Entity - Session Persistence</strong></p>
+<pre><code class="has-line-data" data-line-start="248" data-line-end="261" class="language-java"><span class="hljs-annotation">@Entity</span>
+<span class="hljs-annotation">@Table</span>(name = <span class="hljs-string">"refresh_tokens"</span>)
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">RefreshToken</span> </span>{
+    <span class="hljs-keyword">private</span> UUID id;
+    <span class="hljs-keyword">private</span> UUID userId;           <span class="hljs-comment">// Foreign key to user</span>
+    <span class="hljs-keyword">private</span> String tokenHash;      <span class="hljs-comment">// SHA-256 hashed token</span>
+    <span class="hljs-keyword">private</span> Instant issuedAt;
+    <span class="hljs-keyword">private</span> Instant expiresAt;
+    <span class="hljs-keyword">private</span> Instant revokedAt;     <span class="hljs-comment">// Nullable for active tokens</span>
+    <span class="hljs-keyword">private</span> String ipAddress;
+    <span class="hljs-keyword">private</span> String userAgent;
+}
+</code></pre>
+<p class="has-line-data" data-line-start="264" data-line-end="265"><strong>Token Validation Logic:</strong></p>
+<pre><code class="has-line-data" data-line-start="266" data-line-end="278" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">isExpired</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">return</span> Instant.now().isAfter(<span class="hljs-keyword">this</span>.expiresAt);
+}
+
+<span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">isRevoked</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">return</span> <span class="hljs-keyword">this</span>.revokedAt != <span class="hljs-keyword">null</span>;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">isValid</span><span class="hljs-params">()</span> </span>{
+    <span class="hljs-keyword">return</span> !isExpired() &amp;&amp; !isRevoked();
+}
+</code></pre>
+<p class="has-line-data" data-line-start="279" data-line-end="280"><strong>Security Features:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="280" data-line-end="281"><strong>Token Rotation</strong>: New refresh token on each use</li>
+<li class="has-line-data" data-line-start="281" data-line-end="282"><strong>Hash Storage</strong>: Prevents database compromise from token theft</li>
+<li class="has-line-data" data-line-start="282" data-line-end="284"><strong>Revocation Tracking</strong>: Manual and automatic token invalidation</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="286" data-line-end="287"><strong>💾 Repository Layer Analysis</strong></p>
+<p class="has-line-data" data-line-start="288" data-line-end="289"><strong>UserRepository - Identity Queries</strong></p>
+<pre><code class="has-line-data" data-line-start="291" data-line-end="305" class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">UserRepository</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">JpaRepository</span>&lt;<span class="hljs-title">User</span>, <span class="hljs-title">UUID</span>&gt; </span>{
+    
+    <span class="hljs-comment">// Authentication Queries</span>
+    <span class="hljs-function">Optional&lt;User&gt; <span class="hljs-title">findByUsernameIgnoreCase</span><span class="hljs-params">(String username)</span></span>;
+    <span class="hljs-function">Optional&lt;User&gt; <span class="hljs-title">findByEmailIgnoreCase</span><span class="hljs-params">(String email)</span></span>;
+    
+    <span class="hljs-comment">// Validation Queries</span>
+    <span class="hljs-function"><span class="hljs-keyword">boolean</span> <span class="hljs-title">existsByUsername</span><span class="hljs-params">(String username)</span></span>;
+    <span class="hljs-function"><span class="hljs-keyword">boolean</span> <span class="hljs-title">existsByEmail</span><span class="hljs-params">(String email)</span></span>;
+    
+    <span class="hljs-comment">// Administrative Queries</span>
+    <span class="hljs-function">Page&lt;User&gt; <span class="hljs-title">findAll</span><span class="hljs-params">(Pageable pageable)</span></span>;
+}
+</code></pre>
+<p class="has-line-data" data-line-start="310" data-line-end="311"><strong>Query Optimization:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="311" data-line-end="312"><strong>Case-insensitive searches</strong> for username/email</li>
+<li class="has-line-data" data-line-start="312" data-line-end="313"><strong>Boolean exists checks</strong> for validation performance</li>
+<li class="has-line-data" data-line-start="313" data-line-end="315"><strong>Pagination support</strong> for large user bases</li>
+</ul>
+<p class="has-line-data" data-line-start="315" data-line-end="316"><strong>RefreshTokenRepository - Session Management</strong></p>
+<pre><code class="has-line-data" data-line-start="318" data-line-end="332" class="language-java"><span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">interface</span> <span class="hljs-title">RefreshTokenRepository</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">JpaRepository</span>&lt;<span class="hljs-title">RefreshToken</span>, <span class="hljs-title">UUID</span>&gt; </span>{
+    
+    <span class="hljs-comment">// Token Validation</span>
+    <span class="hljs-function">Optional&lt;RefreshToken&gt; <span class="hljs-title">findByTokenHash</span><span class="hljs-params">(String tokenHash)</span></span>;
+    
+    <span class="hljs-comment">// User Session Management</span>
+    <span class="hljs-function">List&lt;RefreshToken&gt; <span class="hljs-title">findByUserIdAndRevokedAtIsNull</span><span class="hljs-params">(UUID userId)</span></span>;
+    
+    <span class="hljs-comment">// Bulk Operations</span>
+    <span class="hljs-annotation">@Modifying</span>
+    <span class="hljs-annotation">@Query</span>(<span class="hljs-string">"UPDATE RefreshToken rt SET rt.revokedAt = CURRENT_TIMESTAMP WHERE rt.userId = :userId AND rt.revokedAt IS NULL"</span>)
+    <span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">revokeAllByUserId</span><span class="hljs-params">(@Param(<span class="hljs-string">"userId"</span>)</span> UUID userId)</span>;
+}
+</code></pre>
+<p class="has-line-data" data-line-start="333" data-line-end="334"><strong>Session Management Features:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="334" data-line-end="335"><strong>Find active tokens</strong> for user session listing</li>
+<li class="has-line-data" data-line-start="335" data-line-end="336"><strong>Bulk revocation</strong> for password changes or security events</li>
+<li class="has-line-data" data-line-start="336" data-line-end="338"><strong>Token hash lookup</strong> for refresh token validation</li>
+</ul>
+<p class="has-line-data" data-line-start="338" data-line-end="339"><strong>Custom Query Patterns</strong></p>
+<p class="has-line-data" data-line-start="340" data-line-end="341"><strong>Soft Delete with JPA</strong></p>
+<pre><code class="has-line-data" data-line-start="342" data-line-end="347" class="language-java"><span class="hljs-comment">// In UserRoleRepository</span>
+<span class="hljs-annotation">@Modifying</span>
+<span class="hljs-annotation">@Query</span>(<span class="hljs-string">"UPDATE UserRole ur SET ur.revokedAt = CURRENT_TIMESTAMP WHERE ur.userId = :userId AND ur.roleId = :roleId AND ur.revokedAt IS NULL"</span>)
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">softDeleteByUserIdAndRoleId</span><span class="hljs-params">(@Param(<span class="hljs-string">"userId"</span>)</span> UUID userId, @<span class="hljs-title">Param</span><span class="hljs-params">(<span class="hljs-string">"roleId"</span>)</span> UUID roleId)</span>;
+</code></pre>
+<p class="has-line-data" data-line-start="348" data-line-end="349"><strong>Advantages:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="349" data-line-end="350"><strong>Audit trail</strong> maintained indefinitely</li>
+<li class="has-line-data" data-line-start="350" data-line-end="351"><strong>Data integrity</strong> with soft deletion</li>
+<li class="has-line-data" data-line-start="351" data-line-end="353"><strong>Historical reporting</strong> capabilities</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="355" data-line-end="356"><strong>⚙️ Service Layer Implementation</strong></p>
+<p class="has-line-data" data-line-start="357" data-line-end="358"><strong>AuthService - Core Authentication Logic</strong></p>
+<p class="has-line-data" data-line-start="359" data-line-end="360"><strong>Authentication Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="361" data-line-end="399" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> AuthResponse <span class="hljs-title">authenticate</span><span class="hljs-params">(AuthRequest request)</span> </span>{
+    <span class="hljs-comment">// 1. User Lookup</span>
+    User user = userRepository.findByUsernameIgnoreCase(request.getUsername())
+        .orElseThrow(() -&gt; <span class="hljs-keyword">new</span> AuthenticationException(<span class="hljs-string">"Invalid credentials"</span>));
+    
+    <span class="hljs-comment">// 2. Account Status Check</span>
+    <span class="hljs-keyword">if</span> (user.getStatus() != UserStatus.ACTIVE) {
+        auditService.recordLoginFailure(...);
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> AccountLockedException(<span class="hljs-string">"Account "</span> + user.getStatus());
+    }
+    
+    <span class="hljs-comment">// 3. Password Validation</span>
+    <span class="hljs-keyword">if</span> (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        user.incrementFailedLogin();
+        userRepository.save(user);
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> AuthenticationException(<span class="hljs-string">"Invalid credentials"</span>);
+    }
+    
+    <span class="hljs-comment">// 4. MFA Validation (if enabled)</span>
+    <span class="hljs-keyword">if</span> (user.getMfaMethod() != MfaMethod.NONE) {
+        validateMfaCode(user, request.getMfaCode());
+    }
+    
+    <span class="hljs-comment">// 5. Success Processing</span>
+    user.resetFailedLogin();
+    user.setLastLoginAt(Instant.now());
+    userRepository.save(user);
+    
+    <span class="hljs-comment">// 6. Token Generation</span>
+    String accessToken = tokenService.createAccessToken(...);
+    RefreshTokenDto refreshToken = tokenService.createRefreshToken(...);
+    
+    <span class="hljs-comment">// 7. Audit Logging</span>
+    auditService.recordLoginSuccess(...);
+    
+    <span class="hljs-keyword">return</span> buildAuthResponse(accessToken, refreshToken, user);
+}
+</code></pre>
+<p class="has-line-data" data-line-start="400" data-line-end="401"><strong>Token Refresh with Rotation</strong></p>
+<pre><code class="has-line-data" data-line-start="402" data-line-end="431" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> AuthResponse <span class="hljs-title">refreshToken</span><span class="hljs-params">(String refreshToken)</span> </span>{
+    <span class="hljs-comment">// 1. Token Validation</span>
+    String tokenHash = TokenHashUtil.hashToken(refreshToken);
+    RefreshToken storedToken = refreshTokenRepository.findByTokenHash(tokenHash)
+        .orElseThrow(() -&gt; <span class="hljs-keyword">new</span> TokenException(<span class="hljs-string">"Invalid refresh token"</span>));
+    
+    <span class="hljs-comment">// 2. Security Checks</span>
+    <span class="hljs-keyword">if</span> (storedToken.isExpired() || storedToken.isRevoked()) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> TokenException(<span class="hljs-string">"Refresh token expired or revoked"</span>);
+    }
+    
+    <span class="hljs-comment">// 3. User Validation</span>
+    User user = userRepository.findById(storedToken.getUserId())
+        .orElseThrow(() -&gt; <span class="hljs-keyword">new</span> UserNotFoundException(<span class="hljs-string">"User not found"</span>));
+    
+    <span class="hljs-comment">// 4. Token Rotation (Security Best Practice)</span>
+    storedToken.revoke(); <span class="hljs-comment">// Revoke old token</span>
+    refreshTokenRepository.save(storedToken);
+    
+    <span class="hljs-comment">// 5. Issue New Tokens</span>
+    String newAccessToken = tokenService.createAccessToken(...);
+    RefreshTokenDto newRefreshToken = tokenService.createRefreshToken(...);
+    
+    <span class="hljs-comment">// 6. Audit Trail</span>
+    auditService.recordTokenRefresh(...);
+    
+    <span class="hljs-keyword">return</span> buildAuthResponse(newAccessToken, newRefreshToken, user);
+}
+</code></pre>
+<p class="has-line-data" data-line-start="436" data-line-end="437"><strong>Security Benefits of Token Rotation:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="437" data-line-end="438"><strong>Prevents replay attacks</strong> - old tokens become invalid</li>
+<li class="has-line-data" data-line-start="438" data-line-end="439"><strong>Shortens exposure window</strong> - compromised tokens have limited lifespan</li>
+<li class="has-line-data" data-line-start="439" data-line-end="441"><strong>Enables detection</strong> - reused tokens indicate security breach</li>
+</ul>
+<p class="has-line-data" data-line-start="441" data-line-end="442"><strong>MfaService - Multi-Factor Authentication</strong></p>
+<p class="has-line-data" data-line-start="443" data-line-end="444"><strong>TOTP Provisioning Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="445" data-line-end="470" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> MfaProvisioningDto <span class="hljs-title">provisionMfa</span><span class="hljs-params">(UUID userId, MfaMethod method)</span> </span>{
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -&gt; <span class="hljs-keyword">new</span> UserNotFoundException(<span class="hljs-string">"User not found"</span>));
+    
+    <span class="hljs-comment">// Generate TOTP Secret</span>
+    String secret = mfaUtil.generateSecret();
+    
+    <span class="hljs-comment">// Create QR Code URI</span>
+    String provisioningUri = mfaUtil.getQrCodeImageUri(
+        secret, 
+        user.getUsername(), 
+        <span class="hljs-string">"HRMS-Suite"</span>
+    );
+    
+    <span class="hljs-comment">// Store encrypted secret (but don't enable yet)</span>
+    user.setMfaSecret(encryptionService.encrypt(secret));
+    userRepository.save(user);
+    
+    <span class="hljs-keyword">return</span> MfaProvisioningDto.builder()
+        .method(method)
+        .provisioningUri(provisioningUri)
+        .secret(secret) <span class="hljs-comment">// One-time display for user</span>
+        .build();
+}
+</code></pre>
+<p class="has-line-data" data-line-start="471" data-line-end="472"><strong>MFA Enablement with Verification</strong></p>
+<pre><code class="has-line-data" data-line-start="473" data-line-end="488" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">enableMfa</span><span class="hljs-params">(UUID userId, MfaEnableRequest request)</span> </span>{
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -&gt; <span class="hljs-keyword">new</span> UserNotFoundException(<span class="hljs-string">"User not found"</span>));
+    
+    <span class="hljs-comment">// Verify the provided code matches expected</span>
+    String decryptedSecret = encryptionService.decrypt(user.getMfaSecret());
+    <span class="hljs-keyword">if</span> (!mfaUtil.verifyCode(request.getVerificationCode(), decryptedSecret)) {
+        <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> MfaValidationException(<span class="hljs-string">"Invalid verification code"</span>);
+    }
+    
+    <span class="hljs-comment">// Only enable after successful verification</span>
+    user.setMfaMethod(request.getMethod());
+    userRepository.save(user);
+}
+</code></pre>
+<p class="has-line-data" data-line-start="493" data-line-end="494"><strong>TOTP Security Implementation:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="494" data-line-end="495"><strong>RFC 6238 compliant</strong> - Standard time-based algorithm</li>
+<li class="has-line-data" data-line-start="495" data-line-end="496"><strong>30-second windows</strong> - Balance security and usability</li>
+<li class="has-line-data" data-line-start="496" data-line-end="497"><strong>QR code generation</strong> - Easy mobile app integration</li>
+<li class="has-line-data" data-line-start="497" data-line-end="499"><strong>Secret encryption</strong> - Database-level protection</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="501" data-line-end="502"><strong>🔐 Security Infrastructure</strong></p>
+<p class="has-line-data" data-line-start="503" data-line-end="504"><strong>JWT Token Provider</strong></p>
+<p class="has-line-data" data-line-start="505" data-line-end="506"><strong>Token Generation</strong></p>
+<pre><code class="has-line-data" data-line-start="507" data-line-end="521" class="language-java"><span class="hljs-function"><span class="hljs-keyword">public</span> String <span class="hljs-title">generateToken</span><span class="hljs-params">(String subject, Instant expiration, String jti)</span> </span>{
+    <span class="hljs-keyword">return</span> Jwts.builder()
+        .setSubject(subject)                    <span class="hljs-comment">// User ID</span>
+        .setIssuer(jwtConfig.getIssuer())       <span class="hljs-comment">// HRMS-Suite</span>
+        .setIssuedAt(Date.from(Instant.now()))  <span class="hljs-comment">// Issued time</span>
+        .setExpiration(Date.from(expiration))   <span class="hljs-comment">// Expiry time</span>
+        .setId(jti)                             <span class="hljs-comment">// Unique token ID</span>
+        .claim(<span class="hljs-string">"preferred_username"</span>, username)  <span class="hljs-comment">// Human-readable ID</span>
+        .claim(<span class="hljs-string">"roles"</span>, roles)                  <span class="hljs-comment">// Authorization claims</span>
+        .claim(<span class="hljs-string">"employeeId"</span>, employeeId)        <span class="hljs-comment">// Cross-module reference</span>
+        .signWith(getSecretKey())               <span class="hljs-comment">// HMAC-SHA signing</span>
+        .compact();
+}
+</code></pre>
+<p class="has-line-data" data-line-start="522" data-line-end="523"><strong>JWT Claims Structure</strong></p>
+<pre><code class="has-line-data" data-line-start="524" data-line-end="535" class="language-json">{
+  "<span class="hljs-attribute">sub</span>": <span class="hljs-value"><span class="hljs-string">"a1b2c3d4-e5f6-7890-abcd-ef1234567890"</span></span>,
+  "<span class="hljs-attribute">iss</span>": <span class="hljs-value"><span class="hljs-string">"hrms-suite"</span></span>,
+  "<span class="hljs-attribute">iat</span>": <span class="hljs-value"><span class="hljs-number">1672531200</span></span>,
+  "<span class="hljs-attribute">exp</span>": <span class="hljs-value"><span class="hljs-number">1672532100</span></span>,
+  "<span class="hljs-attribute">jti</span>": <span class="hljs-value"><span class="hljs-string">"unique-token-id-12345"</span></span>,
+  "<span class="hljs-attribute">preferred_username</span>": <span class="hljs-value"><span class="hljs-string">"john.doe"</span></span>,
+  "<span class="hljs-attribute">roles</span>": <span class="hljs-value">[<span class="hljs-string">"ROLE_EMPLOYEE"</span>, <span class="hljs-string">"ROLE_MANAGER"</span>]</span>,
+  "<span class="hljs-attribute">employeeId</span>": <span class="hljs-value"><span class="hljs-string">"b2c3d4e5-f6g7-8901-bcde-f23456789012"</span>
+</span>}
+</code></pre>
+<p class="has-line-data" data-line-start="536" data-line-end="537"><strong>Claim Purposes:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="537" data-line-end="538"><code>sub</code> - Subject (User ID) for identity</li>
+<li class="has-line-data" data-line-start="538" data-line-end="539"><code>roles</code> - Authorization for method security</li>
+<li class="has-line-data" data-line-start="539" data-line-end="540"><code>employeeId</code> - Cross-module data correlation</li>
+<li class="has-line-data" data-line-start="540" data-line-end="542"><code>jti</code> - Unique identifier for token revocation</li>
+</ul>
+<p class="has-line-data" data-line-start="542" data-line-end="543"><strong>JWT Authentication Filter</strong></p>
+<p class="has-line-data" data-line-start="544" data-line-end="545"><strong>Request Processing Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="546" data-line-end="576" class="language-java"><span class="hljs-function"><span class="hljs-keyword">protected</span> <span class="hljs-keyword">void</span> <span class="hljs-title">doFilterInternal</span><span class="hljs-params">(HttpServletRequest request, 
+                              HttpServletResponse response, 
+                              FilterChain filterChain)</span> </span>{
+    
+    <span class="hljs-comment">// 1. Extract Authorization Header</span>
+    String authHeader = request.getHeader(<span class="hljs-string">"Authorization"</span>);
+    <span class="hljs-keyword">if</span> (authHeader == <span class="hljs-keyword">null</span> || !authHeader.startsWith(<span class="hljs-string">"Bearer "</span>)) {
+        filterChain.doFilter(request, response);
+        <span class="hljs-keyword">return</span>;
+    }
+    
+    <span class="hljs-comment">// 2. Extract and Validate Token</span>
+    String token = authHeader.substring(<span class="hljs-number">7</span>);
+    <span class="hljs-keyword">if</span> (jwtTokenProvider.validateToken(token)) {
+        
+        <span class="hljs-comment">// 3. Parse Claims and Create Authentication</span>
+        TokenClaims claims = tokenService.parseAndValidateAccessToken(token);
+        List&lt;SimpleGrantedAuthority&gt; authorities = extractAuthorities(claims);
+        
+        <span class="hljs-comment">// 4. Set Security Context</span>
+        UsernamePasswordAuthenticationToken authentication = 
+            <span class="hljs-keyword">new</span> UsernamePasswordAuthenticationToken(claims.getSub(), <span class="hljs-keyword">null</span>, authorities);
+        authentication.setDetails(<span class="hljs-keyword">new</span> WebAuthenticationDetailsSource().buildDetails(request));
+        
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+    }
+    
+    filterChain.doFilter(request, response);
+}
+</code></pre>
+<p class="has-line-data" data-line-start="577" data-line-end="578"><strong>Security Context Propagation:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="578" data-line-end="579"><strong>Thread-local storage</strong> of authentication details</li>
+<li class="has-line-data" data-line-start="579" data-line-end="580"><strong>Automatic cleanup</strong> after request processing</li>
+<li class="has-line-data" data-line-start="580" data-line-end="582"><strong>Method-level security</strong> integration via <code>@PreAuthorize</code></li>
+</ul>
+<p class="has-line-data" data-line-start="582" data-line-end="583"><strong>Password Security</strong></p>
+<p class="has-line-data" data-line-start="584" data-line-end="585"><strong>Argon2 Password Encoding</strong></p>
+<pre><code class="has-line-data" data-line-start="586" data-line-end="603" class="language-java"><span class="hljs-annotation">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">PasswordEncoderUtil</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> PasswordEncoder passwordEncoder;
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">PasswordEncoderUtil</span><span class="hljs-params">()</span> </span>{
+        <span class="hljs-keyword">this</span>.passwordEncoder = Argon2PasswordEncoder.defaultsForSpringSecurity_v5_8();
+    }
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> String <span class="hljs-title">encode</span><span class="hljs-params">(String rawPassword)</span> </span>{
+        <span class="hljs-keyword">return</span> passwordEncoder.encode(rawPassword);
+    }
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">matches</span><span class="hljs-params">(String rawPassword, String encodedPassword)</span> </span>{
+        <span class="hljs-keyword">return</span> passwordEncoder.matches(rawPassword, encodedPassword);
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="604" data-line-end="605"><strong>Argon2 Advantages:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="605" data-line-end="606"><strong>Memory-hard function</strong> - Resistant to GPU/ASIC attacks</li>
+<li class="has-line-data" data-line-start="606" data-line-end="607"><strong>Time and memory configurable</strong> - Adaptive to hardware</li>
+<li class="has-line-data" data-line-start="607" data-line-end="609"><strong>Salt automatically handled</strong> - No manual salt management</li>
+</ul>
+<p class="has-line-data" data-line-start="609" data-line-end="610"><strong>🌐 Controller Layer &amp; API Design</strong></p>
+<p class="has-line-data" data-line-start="611" data-line-end="612"><strong>REST API Architecture</strong></p>
+<p class="has-line-data" data-line-start="613" data-line-end="614"><strong>API Versioning &amp; Base Structure</strong></p>
+<pre><code class="has-line-data" data-line-start="615" data-line-end="622" class="language-java"><span class="hljs-annotation">@RestController</span>
+<span class="hljs-annotation">@RequestMapping</span>(<span class="hljs-string">"/api/v1/auth"</span>)  <span class="hljs-comment">// Versioned API endpoint</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">AuthController</span> </span>{
+    <span class="hljs-comment">// All endpoints return standardized responses</span>
+    <span class="hljs-comment">// Consistent error handling across all operations</span>
+}
+</code></pre>
+<p class="has-line-data" data-line-start="623" data-line-end="624"><strong>Authentication Endpoints</strong></p>
+<p class="has-line-data" data-line-start="625" data-line-end="626"><strong>1. Login Endpoint - Public Access</strong></p>
+<pre><code class="has-line-data" data-line-start="627" data-line-end="635" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/login"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;AuthResponse&gt; <span class="hljs-title">login</span><span class="hljs-params">(@Valid @RequestBody AuthRequest request)</span> </span>{
+    <span class="hljs-comment">// Input Validation: @Valid triggers Bean Validation</span>
+    <span class="hljs-comment">// Business Logic: AuthService.authenticate()</span>
+    <span class="hljs-comment">// Response: Standardized AuthResponse DTO</span>
+    <span class="hljs-keyword">return</span> ResponseEntity.ok(authService.authenticate(request));
+}
+</code></pre>
+<p class="has-line-data" data-line-start="636" data-line-end="637"><strong>Request Flow:</strong></p>
+<pre><code class="has-line-data" data-line-start="638" data-line-end="670">HTTP POST /api/v1/auth/login
+Content-Type: application/json
+
+{
+  &quot;username&quot;: &quot;john.doe&quot;,
+  &quot;password&quot;: &quot;securePassword123&quot;,
+  &quot;mfaCode&quot;: &quot;123456&quot;  // Optional, required if MFA enabled
+}
+
+↓ Spring Validation (@Valid)
+↓ AuthService.authenticate() 
+↓ User lookup + Password verification
+↓ MFA validation (if enabled)
+↓ Token generation
+↓ Audit logging
+
+HTTP 200 OK
+{
+  &quot;accessToken&quot;: &quot;eyJhbGciOiJIUzI1NiIs...&quot;,
+  &quot;expiresIn&quot;: &quot;PT15M&quot;,
+  &quot;refreshToken&quot;: &quot;dG9rZW4tcmVmcmVzaC1pZA...&quot;,
+  &quot;issuedAt&quot;: &quot;2023-12-01T10:30:00Z&quot;,
+  &quot;user&quot;: {
+    &quot;id&quot;: &quot;uuid&quot;,
+    &quot;username&quot;: &quot;john.doe&quot;,
+    &quot;email&quot;: &quot;<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="573d383f39793338321734383a2736392e7934383a">[email&#160;protected]</a>&quot;,
+    &quot;status&quot;: &quot;ACTIVE&quot;,
+    &quot;roles&quot;: [&quot;ROLE_EMPLOYEE&quot;],
+    &quot;employeeId&quot;: &quot;employee-uuid&quot;
+  }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="671" data-line-end="672"><strong>2. Token Refresh Endpoint - Public Access</strong></p>
+<pre><code class="has-line-data" data-line-start="673" data-line-end="678" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/refresh"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;AuthResponse&gt; <span class="hljs-title">refreshToken</span><span class="hljs-params">(@RequestBody RefreshTokenRequest request)</span> </span>{
+    <span class="hljs-keyword">return</span> ResponseEntity.ok(authService.refreshToken(request.getRefreshToken()));
+}
+</code></pre>
+<p class="has-line-data" data-line-start="679" data-line-end="680"><strong>Security Implementation:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="680" data-line-end="681"><strong>Token Rotation</strong>: New refresh token issued, old one revoked</li>
+<li class="has-line-data" data-line-start="681" data-line-end="682"><strong>IP Tracking</strong>: Maintains original request context</li>
+<li class="has-line-data" data-line-start="682" data-line-end="684"><strong>Audit Trail</strong>: Records token refresh events</li>
+</ul>
+<p class="has-line-data" data-line-start="684" data-line-end="685"><strong>3. Logout Endpoint - Authenticated Access</strong></p>
+<pre><code class="has-line-data" data-line-start="686" data-line-end="692" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/logout"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;Void&gt; <span class="hljs-title">logout</span><span class="hljs-params">(@RequestBody LogoutRequest request)</span> </span>{
+    authService.revokeRefreshToken(request.getRefreshToken());
+    <span class="hljs-keyword">return</span> ResponseEntity.noContent().build();  <span class="hljs-comment">// HTTP 204</span>
+}
+</code></pre>
+<p class="has-line-data" data-line-start="693" data-line-end="694"><strong>Session Cleanup Process:</strong></p>
+<ol>
+<li class="has-line-data" data-line-start="694" data-line-end="695"><strong>Token Revocation</strong>: Marks refresh token as revoked</li>
+<li class="has-line-data" data-line-start="695" data-line-end="696"><strong>Cascade Effect</strong>: Access token remains valid until expiry</li>
+<li class="has-line-data" data-line-start="696" data-line-end="698"><strong>Audit Logging</strong>: Records logout event for security monitoring</li>
+</ol>
+<p class="has-line-data" data-line-start="698" data-line-end="699"><strong>Administrative Endpoints</strong></p>
+<p class="has-line-data" data-line-start="700" data-line-end="701"><strong>User Management Controller</strong></p>
+<pre><code class="has-line-data" data-line-start="702" data-line-end="719" class="language-java"><span class="hljs-annotation">@RestController</span>
+<span class="hljs-annotation">@RequestMapping</span>(<span class="hljs-string">"/api/v1/users"</span>)
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserAdminController</span> </span>{
+    
+    <span class="hljs-annotation">@PostMapping</span>
+    <span class="hljs-annotation">@PreAuthorize</span>(<span class="hljs-string">"hasRole('ROLE_ADMIN') or hasRole('ROLE_HR')"</span>)
+    <span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;UserDto&gt; <span class="hljs-title">createUser</span><span class="hljs-params">(@Valid @RequestBody UserCreateRequest request)</span> </span>{
+        <span class="hljs-keyword">return</span> ResponseEntity.ok(userService.createUser(request));
+    }
+    
+    <span class="hljs-annotation">@GetMapping</span>(<span class="hljs-string">"/{id}"</span>)
+    <span class="hljs-annotation">@PreAuthorize</span>(<span class="hljs-string">"hasRole('ROLE_ADMIN') or hasRole('ROLE_HR') or hasRole('ROLE_MANAGER') or @userSecurity.isSelf(id)"</span>)
+    <span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;UserDto&gt; <span class="hljs-title">getUser</span><span class="hljs-params">(@PathVariable UUID id)</span> </span>{
+        <span class="hljs-keyword">return</span> ResponseEntity.ok(userService.getUser(id));
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="720" data-line-end="721"><strong>Role-Based Access Control Matrix:</strong></p>
+<table class="table table-striped table-bordered">
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>ROLE_ADMIN</th>
+<th>ROLE_HR</th>
+<th>ROLE_MANAGER</th>
+<th>ROLE_EMPLOYEE</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>POST /users</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>GET /users/{id}</td>
+<td>✅</td>
+<td>✅</td>
+<td>Limited</td>
+<td>Self-only</td>
+</tr>
+<tr>
+<td>PUT /users/{id}</td>
+<td>✅</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>DELETE /users/{id}</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+<tr>
+<td>POST /users/{id}/roles</td>
+<td>✅</td>
+<td>❌</td>
+<td>❌</td>
+<td>❌</td>
+</tr>
+</tbody>
+</table>
+<p class="has-line-data" data-line-start="730" data-line-end="731"><strong>Method Security Implementation</strong></p>
+<pre><code class="has-line-data" data-line-start="732" data-line-end="742" class="language-java"><span class="hljs-annotation">@Component</span>(<span class="hljs-string">"userSecurity"</span>)
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserSecurity</span> </span>{
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">isSelf</span><span class="hljs-params">(UUID userId)</span> </span>{
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String currentUserId = authentication.getName();  <span class="hljs-comment">// JWT subject (user ID)</span>
+        <span class="hljs-keyword">return</span> userId.toString().equals(currentUserId);
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="743" data-line-end="744"><strong>Usage in Controllers:</strong></p>
+<pre><code class="has-line-data" data-line-start="745" data-line-end="747" class="language-java"><span class="hljs-annotation">@PreAuthorize</span>(<span class="hljs-string">"hasRole('ROLE_MANAGER') or @userSecurity.isSelf(id)"</span>)
+</code></pre>
+<p class="has-line-data" data-line-start="748" data-line-end="749">This enables:</p>
+<ul>
+<li class="has-line-data" data-line-start="749" data-line-end="750"><strong>Managers</strong> to view their team members</li>
+<li class="has-line-data" data-line-start="750" data-line-end="751"><strong>Employees</strong> to view only their own data</li>
+<li class="has-line-data" data-line-start="751" data-line-end="753"><strong>HR/Admin</strong> to view all users</li>
+</ul>
+<p class="has-line-data" data-line-start="753" data-line-end="754"><strong>Password Reset Flow</strong></p>
+<p class="has-line-data" data-line-start="755" data-line-end="756"><strong>Initiate Reset - Public Endpoint</strong></p>
+<pre><code class="has-line-data" data-line-start="757" data-line-end="763" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/password-reset/initiate"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;Void&gt; <span class="hljs-title">initiatePasswordReset</span><span class="hljs-params">(@RequestBody PasswordResetInitiateRequest request)</span> </span>{
+    authService.initiatePasswordReset(request.getEmail());
+    <span class="hljs-keyword">return</span> ResponseEntity.accepted().build();  <span class="hljs-comment">// HTTP 202 - Async processing</span>
+}
+</code></pre>
+<p class="has-line-data" data-line-start="764" data-line-end="765"><strong>Security Considerations:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="765" data-line-end="766"><strong>No user enumeration</strong>: Same response for valid/invalid emails</li>
+<li class="has-line-data" data-line-start="766" data-line-end="767"><strong>Rate limiting</strong>: Prevents email bombing attacks</li>
+<li class="has-line-data" data-line-start="767" data-line-end="769"><strong>Secure tokens</strong>: Time-limited, single-use reset tokens</li>
+</ul>
+<p class="has-line-data" data-line-start="769" data-line-end="770"><strong>Complete Reset - Public Endpoint</strong></p>
+<pre><code class="has-line-data" data-line-start="771" data-line-end="777" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/password-reset/complete"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;Void&gt; <span class="hljs-title">completePasswordReset</span><span class="hljs-params">(@Valid @RequestBody PasswordResetCompleteRequest request)</span> </span>{
+    authService.completePasswordReset(request.getToken(), request.getNewPassword());
+    <span class="hljs-keyword">return</span> ResponseEntity.noContent().build();
+}
+</code></pre>
+<p class="has-line-data" data-line-start="778" data-line-end="779"><strong>Password Policy Enforcement:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="779" data-line-end="780"><strong>Complexity requirements</strong>: Minimum length, character variety</li>
+<li class="has-line-data" data-line-start="780" data-line-end="781"><strong>History prevention</strong>: Cannot reuse recent passwords</li>
+<li class="has-line-data" data-line-start="781" data-line-end="783"><strong>Session revocation</strong>: All active sessions terminated after password change</li>
+</ul>
+<p class="has-line-data" data-line-start="783" data-line-end="784"><strong>MFA Management Endpoints</strong></p>
+<p class="has-line-data" data-line-start="785" data-line-end="786"><strong>MFA Provisioning</strong></p>
+<pre><code class="has-line-data" data-line-start="787" data-line-end="793" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/mfa/provision"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;MfaProvisioningDto&gt; <span class="hljs-title">provisionMfa</span><span class="hljs-params">(@RequestParam MfaMethod method)</span> </span>{
+    UUID currentUserId = getCurrentUserId();  <span class="hljs-comment">// From security context</span>
+    <span class="hljs-keyword">return</span> ResponseEntity.ok(mfaService.provisionMfa(currentUserId, method));
+}
+</code></pre>
+<p class="has-line-data" data-line-start="794" data-line-end="795"><strong>Response Structure:</strong></p>
+<pre><code class="has-line-data" data-line-start="796" data-line-end="802" class="language-json">{
+  "<span class="hljs-attribute">method</span>": <span class="hljs-value"><span class="hljs-string">"TOTP"</span></span>,
+  "<span class="hljs-attribute">provisioningUri</span>": <span class="hljs-value"><span class="hljs-string">"otpauth://totp/HRMS-Suite:john.doe?secret=JBSWY3DPEHPK3PXP&amp;issuer=HRMS-Suite"</span></span>,
+  "<span class="hljs-attribute">secret</span>": <span class="hljs-value"><span class="hljs-string">"JBSWY3DPEHPK3PXP"</span>
+</span>}
+</code></pre>
+<p class="has-line-data" data-line-start="803" data-line-end="804"><strong>MFA Enablement</strong></p>
+<pre><code class="has-line-data" data-line-start="805" data-line-end="812" class="language-java"><span class="hljs-annotation">@PostMapping</span>(<span class="hljs-string">"/mfa/enable"</span>)
+<span class="hljs-function"><span class="hljs-keyword">public</span> ResponseEntity&lt;Void&gt; <span class="hljs-title">enableMfa</span><span class="hljs-params">(@Valid @RequestBody MfaEnableRequest request)</span> </span>{
+    UUID currentUserId = getCurrentUserId();
+    mfaService.enableMfa(currentUserId, request);
+    <span class="hljs-keyword">return</span> ResponseEntity.noContent().build();
+}
+</code></pre>
+<p class="has-line-data" data-line-start="813" data-line-end="814"><strong>Verification Process:</strong></p>
+<ol>
+<li class="has-line-data" data-line-start="814" data-line-end="815"><strong>QR Code Scan</strong>: User scans with authenticator app</li>
+<li class="has-line-data" data-line-start="815" data-line-end="816"><strong>Code Verification</strong>: User enters generated code</li>
+<li class="has-line-data" data-line-start="816" data-line-end="818"><strong>Secret Storage</strong>: Encrypted secret stored upon successful verification</li>
+</ol>
+<hr>
+<p class="has-line-data" data-line-start="820" data-line-end="821"><strong>🔔 Event-Driven Architecture</strong></p>
+<p class="has-line-data" data-line-start="822" data-line-end="823"><strong>Domain Events Design</strong></p>
+<p class="has-line-data" data-line-start="824" data-line-end="825"><strong>User Lifecycle Events</strong></p>
+<pre><code class="has-line-data" data-line-start="826" data-line-end="856" class="language-java"><span class="hljs-comment">// User Created Event</span>
+<span class="hljs-annotation">@Getter</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserCreatedEvent</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ApplicationEvent</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> UUID userId;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">UserCreatedEvent</span><span class="hljs-params">(Object source, UUID userId)</span> </span>{
+        <span class="hljs-keyword">super</span>(source);
+        <span class="hljs-keyword">this</span>.userId = userId;
+    }
+}
+
+<span class="hljs-comment">// User Updated Event  </span>
+<span class="hljs-annotation">@Getter</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserUpdatedEvent</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ApplicationEvent</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> UUID userId;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">UserUpdatedEvent</span><span class="hljs-params">(Object source, UUID userId)</span> </span>{
+        <span class="hljs-keyword">super</span>(source);
+        <span class="hljs-keyword">this</span>.userId = userId;
+    }
+}
+
+<span class="hljs-comment">// User Disabled Event</span>
+<span class="hljs-annotation">@Getter</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserDisabledEvent</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ApplicationEvent</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> UUID userId;
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">UserDisabledEvent</span><span class="hljs-params">(Object source, UUID userId)</span> </span>{
+        <span class="hljs-keyword">super</span>(source);
+        <span class="hljs-keyword">this</span>.userId = userId;
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="857" data-line-end="858"><strong>Security Events</strong></p>
+<pre><code class="has-line-data" data-line-start="859" data-line-end="885" class="language-java"><span class="hljs-comment">// Refresh Token Revoked Event</span>
+<span class="hljs-annotation">@Getter</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">RefreshTokenRevokedEvent</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ApplicationEvent</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> UUID refreshTokenId;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> UUID userId;
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">RefreshTokenRevokedEvent</span><span class="hljs-params">(Object source, UUID refreshTokenId, UUID userId)</span> </span>{
+        <span class="hljs-keyword">super</span>(source);
+        <span class="hljs-keyword">this</span>.refreshTokenId = refreshTokenId;
+        <span class="hljs-keyword">this</span>.userId = userId;
+    }
+}
+
+<span class="hljs-comment">// Password Reset Requested Event</span>
+<span class="hljs-annotation">@Getter</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">PasswordResetRequestedEvent</span> <span class="hljs-keyword">extends</span> <span class="hljs-title">ApplicationEvent</span> </span>{
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> String email;
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> UUID userId;  <span class="hljs-comment">// Null if user not found (security measure)</span>
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-title">PasswordResetRequestedEvent</span><span class="hljs-params">(Object source, String email, UUID userId)</span> </span>{
+        <span class="hljs-keyword">super</span>(source);
+        <span class="hljs-keyword">this</span>.email = email;
+        <span class="hljs-keyword">this</span>.userId = userId;
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="886" data-line-end="887"><strong>Event Publishing Patterns</strong></p>
+<p class="has-line-data" data-line-start="888" data-line-end="889"><strong>Service-Level Event Publishing</strong></p>
+<pre><code class="has-line-data" data-line-start="890" data-line-end="908" class="language-java"><span class="hljs-annotation">@Service</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserServiceImpl</span> <span class="hljs-keyword">implements</span> <span class="hljs-title">UserService</span> </span>{
+    
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> ApplicationEventPublisher eventPublisher;
+    
+    <span class="hljs-annotation">@Override</span>
+    <span class="hljs-annotation">@Transactional</span>
+    <span class="hljs-function"><span class="hljs-keyword">public</span> UserDto <span class="hljs-title">createUser</span><span class="hljs-params">(UserCreateRequest request)</span> </span>{
+        User user = <span class="hljs-comment">// ... creation logic</span>
+        User savedUser = userRepository.save(user);
+        
+        <span class="hljs-comment">// Publish after successful persistence</span>
+        eventPublisher.publishEvent(<span class="hljs-keyword">new</span> UserCreatedEvent(<span class="hljs-keyword">this</span>, savedUser.getId()));
+        
+        <span class="hljs-keyword">return</span> convertToDto(savedUser);
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="909" data-line-end="910"><strong>Transaction Boundary Considerations:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="910" data-line-end="911"><strong>After commit</strong>: Events published only after successful transaction</li>
+<li class="has-line-data" data-line-start="911" data-line-end="912"><strong>Synchronous processing</strong>: Events processed in same thread by default</li>
+<li class="has-line-data" data-line-start="912" data-line-end="914"><strong>Error handling</strong>: Failed event listeners don’t roll back transaction</li>
+</ul>
+<p class="has-line-data" data-line-start="914" data-line-end="915"><strong>Event Consumers &amp; Integration Points</strong></p>
+<p class="has-line-data" data-line-start="916" data-line-end="917"><strong>Notification Module Integration</strong></p>
+<pre><code class="has-line-data" data-line-start="918" data-line-end="940" class="language-java"><span class="hljs-annotation">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserCreatedEventListener</span> </span>{
+    
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> NotificationService notificationService;
+    
+    <span class="hljs-annotation">@EventListener</span>
+    <span class="hljs-annotation">@Async</span>  <span class="hljs-comment">// Process asynchronously to not block main flow</span>
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">handleUserCreated</span><span class="hljs-params">(UserCreatedEvent event)</span> </span>{
+        <span class="hljs-comment">// Send welcome email</span>
+        NotificationRequest welcomeEmail = buildWelcomeEmail(event.getUserId());
+        notificationService.sendNotification(welcomeEmail);
+    }
+    
+    <span class="hljs-annotation">@EventListener</span>
+    <span class="hljs-annotation">@Async</span>
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">handlePasswordReset</span><span class="hljs-params">(PasswordResetRequestedEvent event)</span> </span>{
+        <span class="hljs-comment">// Send password reset email</span>
+        NotificationRequest resetEmail = buildResetEmail(event.getEmail());
+        notificationService.sendNotification(resetEmail);
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="941" data-line-end="942"><strong>Audit Module Integration</strong></p>
+<pre><code class="has-line-data" data-line-start="943" data-line-end="959" class="language-java"><span class="hljs-annotation">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">SecurityEventListener</span> </span>{
+    
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> AuditService auditService;
+    
+    <span class="hljs-annotation">@EventListener</span>
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">handleTokenRevocation</span><span class="hljs-params">(RefreshTokenRevokedEvent event)</span> </span>{
+        <span class="hljs-comment">// Log token revocation for security audit</span>
+        auditService.logSecurityEvent(
+            event.getUserId(), 
+            <span class="hljs-string">"REFRESH_TOKEN_REVOKED"</span>, 
+            Map.of(<span class="hljs-string">"refreshTokenId"</span>, event.getRefreshTokenId())
+        );
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="962" data-line-end="963"><strong>Employee Module Integration</strong></p>
+<pre><code class="has-line-data" data-line-start="964" data-line-end="977" class="language-java"><span class="hljs-annotation">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">UserEventListener</span> </span>{
+    
+    <span class="hljs-keyword">private</span> <span class="hljs-keyword">final</span> EmployeeService employeeService;
+    
+    <span class="hljs-annotation">@EventListener</span>
+    <span class="hljs-annotation">@TransactionalEventListener</span>(phase = TransactionPhase.AFTER_COMMIT)
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">handleUserDisabled</span><span class="hljs-params">(UserDisabledEvent event)</span> </span>{
+        <span class="hljs-comment">// Disable corresponding employee record</span>
+        employeeService.disableEmployeeByUserId(event.getUserId());
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="978" data-line-end="979"><strong>Integration Benefits:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="979" data-line-end="980"><strong>Loose coupling</strong>: Modules don’t directly depend on each other</li>
+<li class="has-line-data" data-line-start="980" data-line-end="981"><strong>Eventual consistency</strong>: Systems converge state asynchronously</li>
+<li class="has-line-data" data-line-start="981" data-line-end="983"><strong>Resilience</strong>: Failure in one module doesn’t block others</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="985" data-line-end="986"><strong>🛠️ Utility Components</strong></p>
+<p class="has-line-data" data-line-start="987" data-line-end="988"><strong>JWT Utility - Token Management</strong></p>
+<p class="has-line-data" data-line-start="989" data-line-end="990"><strong>Claims Extraction &amp; Validation</strong></p>
+<pre><code class="has-line-data" data-line-start="991" data-line-end="1019" class="language-java"><span class="hljs-annotation">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">JwtUtil</span> </span>{
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> TokenClaims <span class="hljs-title">extractTokenClaims</span><span class="hljs-params">(Claims claims)</span> </span>{
+        TokenClaims tokenClaims = <span class="hljs-keyword">new</span> TokenClaims();
+        
+        <span class="hljs-comment">// Extract standard claims</span>
+        tokenClaims.setSub(UUID.fromString(claims.getSubject()));
+        tokenClaims.setPreferredUsername(claims.get(<span class="hljs-string">"preferred_username"</span>, String.class));
+        
+        <span class="hljs-comment">// Extract custom claims</span>
+        List&lt;String&gt; rolesList = claims.get(<span class="hljs-string">"roles"</span>, List.class);
+        <span class="hljs-keyword">if</span> (rolesList != <span class="hljs-keyword">null</span>) {
+            List&lt;RoleName&gt; roles = rolesList.stream()
+                .map(role -&gt; RoleName.valueOf(role))
+                .collect(Collectors.toList());
+            tokenClaims.setRoles(roles);
+        }
+        
+        <span class="hljs-comment">// Extract timestamps</span>
+        tokenClaims.setIat(claims.getIssuedAt().toInstant());
+        tokenClaims.setExp(claims.getExpiration().toInstant());
+        tokenClaims.setJti(claims.getId());
+        
+        <span class="hljs-keyword">return</span> tokenClaims;
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="1020" data-line-end="1021"><strong>Claims Processing Logic:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1021" data-line-end="1022"><strong>Type safety</strong>: UUID conversion with validation</li>
+<li class="has-line-data" data-line-start="1022" data-line-end="1023"><strong>Null safety</strong>: Safe extraction of optional claims</li>
+<li class="has-line-data" data-line-start="1023" data-line-end="1025"><strong>Enum mapping</strong>: String to RoleName enum conversion</li>
+</ul>
+<p class="has-line-data" data-line-start="1025" data-line-end="1026"><strong>Token Hash Utility - Secure Storage</strong></p>
+<p class="has-line-data" data-line-start="1027" data-line-end="1028"><strong>Cryptographic Hashing</strong></p>
+<pre><code class="has-line-data" data-line-start="1029" data-line-end="1047" class="language-java"><span class="hljs-annotation">@UtilityClass</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">TokenHashUtil</span> </span>{
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> String <span class="hljs-title">hashToken</span><span class="hljs-params">(String token)</span> </span>{
+        <span class="hljs-keyword">try</span> {
+            MessageDigest digest = MessageDigest.getInstance(<span class="hljs-string">"SHA-256"</span>);
+            <span class="hljs-keyword">byte</span>[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            <span class="hljs-keyword">return</span> Base64.getEncoder().encodeToString(hash);
+        } <span class="hljs-keyword">catch</span> (NoSuchAlgorithmException e) {
+            <span class="hljs-keyword">throw</span> <span class="hljs-keyword">new</span> RuntimeException(<span class="hljs-string">"SHA-256 algorithm not available"</span>, e);
+        }
+    }
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">static</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">verifyToken</span><span class="hljs-params">(String token, String hashedToken)</span> </span>{
+        <span class="hljs-keyword">return</span> hashToken(token).equals(hashedToken);
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="1048" data-line-end="1049"><strong>Security Design:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1049" data-line-end="1050"><strong>SHA-256</strong>: Cryptographically secure hashing algorithm</li>
+<li class="has-line-data" data-line-start="1050" data-line-end="1051"><strong>Base64 encoding</strong>: Database-friendly string representation</li>
+<li class="has-line-data" data-line-start="1051" data-line-end="1053"><strong>Deterministic</strong>: Same input always produces same output for verification</li>
+</ul>
+<p class="has-line-data" data-line-start="1053" data-line-end="1054"><strong>MFA Utility - TOTP Implementation</strong></p>
+<p class="has-line-data" data-line-start="1055" data-line-end="1056"><strong>TOTP Code Generation &amp; Verification</strong></p>
+<pre><code class="has-line-data" data-line-start="1057" data-line-end="1089" class="language-java"><span class="hljs-annotation">@Component</span>
+<span class="hljs-annotation">@Slf</span>4j
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">MfaUtil</span> </span>{
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> String <span class="hljs-title">generateSecret</span><span class="hljs-params">()</span> </span>{
+        <span class="hljs-keyword">return</span> <span class="hljs-keyword">new</span> DefaultSecretGenerator().generate();  <span class="hljs-comment">// 32-character base32</span>
+    }
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> String <span class="hljs-title">getQrCodeImageUri</span><span class="hljs-params">(String secret, String username, String issuer)</span> </span>{
+        QrData data = <span class="hljs-keyword">new</span> QrData.Builder()
+            .label(username)
+            .secret(secret)
+            .issuer(issuer)
+            .algorithm(HashingAlgorithm.SHA1)
+            .digits(<span class="hljs-number">6</span>)
+            .period(<span class="hljs-number">30</span>)  <span class="hljs-comment">// 30-second windows</span>
+            .build();
+        
+        QrGenerator generator = <span class="hljs-keyword">new</span> ZxingPngQrGenerator();
+        <span class="hljs-keyword">byte</span>[] imageData = generator.generate(data);
+        
+        <span class="hljs-keyword">return</span> getDataUriForImage(imageData, generator.getImageMimeType());
+    }
+    
+    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">boolean</span> <span class="hljs-title">verifyCode</span><span class="hljs-params">(String code, String secret)</span> </span>{
+        TimeProvider timeProvider = <span class="hljs-keyword">new</span> SystemTimeProvider();
+        CodeGenerator codeGenerator = <span class="hljs-keyword">new</span> DefaultCodeGenerator();
+        CodeVerifier verifier = <span class="hljs-keyword">new</span> DefaultCodeVerifier(codeGenerator, timeProvider);
+        <span class="hljs-keyword">return</span> verifier.isValidCode(secret, code);
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="1090" data-line-end="1091"><strong>TOTP Configuration:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1091" data-line-end="1092"><strong>Algorithm</strong>: SHA-1 (compatible with most authenticator apps)</li>
+<li class="has-line-data" data-line-start="1092" data-line-end="1093"><strong>Digits</strong>: 6-digit codes (industry standard)</li>
+<li class="has-line-data" data-line-start="1093" data-line-end="1094"><strong>Period</strong>: 30-second intervals (balance security and usability)</li>
+<li class="has-line-data" data-line-start="1094" data-line-end="1096"><strong>Window</strong>: ±1 time period for clock drift tolerance</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="1098" data-line-end="1099"><strong>⚙️ Configuration Management</strong></p>
+<p class="has-line-data" data-line-start="1100" data-line-end="1101"><strong>JWT Configuration Properties</strong></p>
+<p class="has-line-data" data-line-start="1102" data-line-end="1103"><strong>Externalized Configuration</strong></p>
+<pre><code class="has-line-data" data-line-start="1104" data-line-end="1116" class="language-yaml">app:
+  jwt:
+    secret: &quot;mySuperSecretKeyThatIsAtLeast32CharactersLong123!&quot;
+    access-token-ttl: 15m       Short-lived for security
+    refresh-token-ttl: 30d      Long-lived for user convenience
+    issuer: &quot;hrms-suite&quot;        Token issuer identification
+  token:
+    access-token-ttl: 15m
+    refresh-token-ttl: 30d
+    token-rotation-enabled: true       Security best practice
+    max-refresh-tokens-per-user: 5     Prevent token accumulation
+</code></pre>
+<p class="has-line-data" data-line-start="1122" data-line-end="1123"><strong>Configuration Bean</strong></p>
+<pre><code class="has-line-data" data-line-start="1124" data-line-end="1134" class="language-java"><span class="hljs-annotation">@ConfigurationProperties</span>(prefix = <span class="hljs-string">"app.jwt"</span>)
+<span class="hljs-annotation">@Data</span>
+<span class="hljs-annotation">@Component</span>
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">JwtConfigProperties</span> </span>{
+    <span class="hljs-keyword">private</span> String secret;
+    <span class="hljs-keyword">private</span> Duration accessTokenTtl = Duration.ofMinutes(<span class="hljs-number">15</span>);
+    <span class="hljs-keyword">private</span> Duration refreshTokenTtl = Duration.ofDays(<span class="hljs-number">30</span>);
+    <span class="hljs-keyword">private</span> String issuer = <span class="hljs-string">"hrms-suite"</span>;
+}
+</code></pre>
+<p class="has-line-data" data-line-start="1135" data-line-end="1136"><strong>Security Recommendations:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1136" data-line-end="1137"><strong>Production secret</strong>: Environment variable or secret manager</li>
+<li class="has-line-data" data-line-start="1137" data-line-end="1138"><strong>Short access tokens</strong>: 15 minutes for reduced exposure window</li>
+<li class="has-line-data" data-line-start="1138" data-line-end="1140"><strong>Secure token rotation</strong>: Prevents refresh token reuse</li>
+</ul>
+<p class="has-line-data" data-line-start="1140" data-line-end="1141"><strong>Security Configuration</strong></p>
+<p class="has-line-data" data-line-start="1142" data-line-end="1143"><strong>Comprehensive Security Setup</strong></p>
+<pre><code class="has-line-data" data-line-start="1144" data-line-end="1184" class="language-java"><span class="hljs-annotation">@Configuration</span>
+<span class="hljs-annotation">@EnableWebSecurity</span>
+<span class="hljs-annotation">@EnableMethodSecurity</span>(prePostEnabled = <span class="hljs-keyword">true</span>)
+<span class="hljs-keyword">public</span> <span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">SecurityConfig</span> </span>{
+    
+    <span class="hljs-annotation">@Bean</span>
+    <span class="hljs-function"><span class="hljs-keyword">public</span> SecurityFilterChain <span class="hljs-title">filterChain</span><span class="hljs-params">(HttpSecurity http)</span> <span class="hljs-keyword">throws</span> Exception </span>{
+        http
+            .cors(cors -&gt; cors.configurationSource(corsConfigurationSource()))
+            .csrf(AbstractHttpConfigurer::disable)  <span class="hljs-comment">// Stateless API - JWT protected</span>
+            .sessionManagement(session -&gt; session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(authz -&gt; authz
+                .requestMatchers(<span class="hljs-string">"/api/v1/auth/login"</span>).permitAll()
+                .requestMatchers(<span class="hljs-string">"/api/v1/auth/refresh"</span>).permitAll()
+                .requestMatchers(<span class="hljs-string">"/api/v1/auth/password-reset/**"</span>).permitAll()
+                .requestMatchers(<span class="hljs-string">"/api/v1/auth/introspect"</span>).hasRole(<span class="hljs-string">"SYSTEM"</span>)
+                .requestMatchers(<span class="hljs-string">"/api/v1/auth/revoke"</span>).hasAnyRole(<span class="hljs-string">"ADMIN"</span>, <span class="hljs-string">"SYSTEM"</span>)
+                .requestMatchers(<span class="hljs-string">"/api/v1/users/**"</span>).authenticated()
+                .requestMatchers(<span class="hljs-string">"/api/v1/roles/**"</span>).hasRole(<span class="hljs-string">"ADMIN"</span>)
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+        
+        <span class="hljs-keyword">return</span> http.build();
+    }
+    
+    <span class="hljs-annotation">@Bean</span>
+    <span class="hljs-function"><span class="hljs-keyword">public</span> CorsConfigurationSource <span class="hljs-title">corsConfigurationSource</span><span class="hljs-params">()</span> </span>{
+        CorsConfiguration configuration = <span class="hljs-keyword">new</span> CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList(<span class="hljs-string">"*"</span>));  <span class="hljs-comment">// Configure appropriately</span>
+        configuration.setAllowedMethods(Arrays.asList(<span class="hljs-string">"GET"</span>, <span class="hljs-string">"POST"</span>, <span class="hljs-string">"PUT"</span>, <span class="hljs-string">"DELETE"</span>, <span class="hljs-string">"OPTIONS"</span>));
+        configuration.setAllowedHeaders(Arrays.asList(<span class="hljs-string">"*"</span>));
+        configuration.setAllowCredentials(<span class="hljs-keyword">true</span>);
+        
+        UrlBasedCorsConfigurationSource source = <span class="hljs-keyword">new</span> UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration(<span class="hljs-string">"/**"</span>, configuration);
+        <span class="hljs-keyword">return</span> source;
+    }
+}
+</code></pre>
+<p class="has-line-data" data-line-start="1185" data-line-end="1186"><strong>CORS Security Considerations:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1186" data-line-end="1187"><strong>Origin patterns</strong>: Restrict to known domains in production</li>
+<li class="has-line-data" data-line-start="1187" data-line-end="1188"><strong>Credentials</strong>: Allow cookies/auth headers</li>
+<li class="has-line-data" data-line-start="1188" data-line-end="1190"><strong>Methods</strong>: Limit to required HTTP methods</li>
+</ul>
+<p class="has-line-data" data-line-start="1190" data-line-end="1191"><strong>Database Configuration</strong></p>
+<p class="has-line-data" data-line-start="1192" data-line-end="1193"><strong>PostgreSQL Setup</strong></p>
+<pre><code class="has-line-data" data-line-start="1194" data-line-end="1212" class="language-yaml">spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hrms
+    username: hrms_user
+    password: ${DB_PASSWORD:defaultPassword}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate         Safety - no auto schema changes
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  sql:
+    init:
+      mode: always              Always run schema.sql on startup
+</code></pre>
+<p class="has-line-data" data-line-start="1213" data-line-end="1214"><strong>Database Best Practices:</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1214" data-line-end="1215"><strong>Schema validation</strong>: Prevent accidental schema changes</li>
+<li class="has-line-data" data-line-start="1215" data-line-end="1216"><strong>SQL formatting</strong>: Development debugging aid</li>
+<li class="has-line-data" data-line-start="1216" data-line-end="1218"><strong>Explicit initialization</strong>: Controlled database setup</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="1220" data-line-end="1221"><strong>🔄 Complete Data Flow</strong></p>
+<p class="has-line-data" data-line-start="1222" data-line-end="1223"><strong>User Registration Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="1225" data-line-end="1239">1. HTTP POST /api/v1/users
+   ↓
+2. UserAdminController.createUser()
+   ↓ @PreAuthorize(&quot;hasRole('ROLE_ADMIN') or hasRole('ROLE_HR')&quot;)
+   ↓
+3. UserService.createUser()
+   ↓ Validation: username/email uniqueness
+   ↓ Password hashing with Argon2
+   ↓ Database persistence
+   ↓
+4. Event: UserCreatedEvent published
+   ↓
+5. Response: UserDto with masked sensitive data
+</code></pre>
+<p class="has-line-data" data-line-start="1240" data-line-end="1241"><strong>Authentication Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="1243" data-line-end="1264">1. HTTP POST /api/v1/auth/login
+   ↓
+2. AuthController.login()
+   ↓ Input validation (@Valid)
+   ↓
+3. AuthService.authenticate()
+   ↓ User lookup (case-insensitive)
+   ↓ Account status check (ACTIVE/DISABLED/LOCKED)
+   ↓ Password verification (timing-attack resistant)
+   ↓ MFA validation (if enabled)
+   ↓ Failed login counter management
+   ↓
+4. TokenService token generation
+   ↓ JWT access token (15min expiry)
+   ↓ Refresh token (30 days, hashed storage)
+   ↓
+5. AuditService event logging
+   ↓ Login success/failure records
+   ↓
+6. Response: AuthResponse with tokens and user info
+</code></pre>
+<p class="has-line-data" data-line-start="1265" data-line-end="1266"><strong>Token Refresh Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="1268" data-line-end="1282">1. HTTP POST /api/v1/auth/refresh
+   ↓
+2. AuthController.refreshToken()
+   ↓
+3. AuthService.refreshToken()
+   ↓ Refresh token validation (hash lookup)
+   ↓ Token expiration/revocation checks
+   ↓ User status validation
+   ↓ Token rotation (revoke old, issue new)
+   ↓
+4. AuditService token refresh logging
+   ↓
+5. Response: New access and refresh tokens
+</code></pre>
+<p class="has-line-data" data-line-start="1283" data-line-end="1284"><strong>Role Assignment Flow</strong></p>
+<pre><code class="has-line-data" data-line-start="1286" data-line-end="1298">1. HTTP POST /api/v1/users/{id}/roles
+   ↓ @PreAuthorize(&quot;hasRole('ROLE_ADMIN')&quot;)
+   ↓
+2. RoleService.assignRoleToUser()
+   ↓ Role existence validation
+   ↓ Duplicate assignment prevention
+   ↓ UserRole entity creation
+   ↓
+3. Database: user_roles record with assigned_at
+   ↓
+4. Response: HTTP 204 No Content
+</code></pre>
+<hr>
+<p class="has-line-data" data-line-start="1301" data-line-end="1302"><strong>🔒 Security Considerations</strong></p>
+<p class="has-line-data" data-line-start="1303" data-line-end="1304"><strong>Authentication Security</strong></p>
+<p class="has-line-data" data-line-start="1305" data-line-end="1306"><strong>Password Security</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1306" data-line-end="1307"><strong>Argon2id</strong>: Memory-hard algorithm resistant to GPU attacks</li>
+<li class="has-line-data" data-line-start="1307" data-line-end="1308"><strong>Salt integration</strong>: Automatic salting prevents rainbow tables</li>
+<li class="has-line-data" data-line-start="1308" data-line-end="1310"><strong>Timing attack protection</strong>: Constant-time comparison</li>
+</ul>
+<p class="has-line-data" data-line-start="1310" data-line-end="1311"><strong>Session Management</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1311" data-line-end="1312"><strong>Short-lived access tokens</strong>: 15-minute expiry limits exposure</li>
+<li class="has-line-data" data-line-start="1312" data-line-end="1313"><strong>Long-lived refresh tokens</strong>: 30-day convenience with secure storage</li>
+<li class="has-line-data" data-line-start="1313" data-line-end="1314"><strong>Token rotation</strong>: Prevents refresh token replay attacks</li>
+<li class="has-line-data" data-line-start="1314" data-line-end="1316"><strong>Comprehensive revocation</strong>: Manual and automatic token invalidation</li>
+</ul>
+<p class="has-line-data" data-line-start="1316" data-line-end="1317"><strong>Authorization Security</strong></p>
+<p class="has-line-data" data-line-start="1318" data-line-end="1319"><strong>Role-Based Access Control</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1319" data-line-end="1320"><strong>Fine-grained permissions</strong>: Method-level security annotations</li>
+<li class="has-line-data" data-line-start="1320" data-line-end="1321"><strong>Context-aware access</strong>: Self-reference for personal data</li>
+<li class="has-line-data" data-line-start="1321" data-line-end="1323"><strong>Hierarchical roles</strong>: Manager &gt; Employee relationships</li>
+</ul>
+<p class="has-line-data" data-line-start="1323" data-line-end="1324"><strong>API Security</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1324" data-line-end="1325"><strong>Input validation</strong>: Bean Validation with custom constraints</li>
+<li class="has-line-data" data-line-start="1325" data-line-end="1326"><strong>SQL injection prevention</strong>: JPA with parameterized queries</li>
+<li class="has-line-data" data-line-start="1326" data-line-end="1328"><strong>XSS protection</strong>: JSON serialization with proper content types</li>
+</ul>
+<p class="has-line-data" data-line-start="1328" data-line-end="1329"><strong>Data Protection</strong></p>
+<p class="has-line-data" data-line-start="1330" data-line-end="1331"><strong>Sensitive Data Handling</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1331" data-line-end="1332"><strong>Password hashing</strong>: Never stored in plaintext</li>
+<li class="has-line-data" data-line-start="1332" data-line-end="1333"><strong>MFA secret encryption</strong>: Application-level encryption before storage</li>
+<li class="has-line-data" data-line-start="1333" data-line-end="1334"><strong>Token hashing</strong>: Refresh tokens hashed in database</li>
+<li class="has-line-data" data-line-start="1334" data-line-end="1336"><strong>Audit log sanitization</strong>: No sensitive data in logs</li>
+</ul>
+<p class="has-line-data" data-line-start="1336" data-line-end="1337"><strong>Database Security</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1337" data-line-end="1338"><strong>UUID primary keys</strong>: Unpredictable identifiers</li>
+<li class="has-line-data" data-line-start="1338" data-line-end="1339"><strong>Foreign key constraints</strong>: Data integrity enforcement</li>
+<li class="has-line-data" data-line-start="1339" data-line-end="1340"><strong>Index optimization</strong>: Performance without compromising security</li>
+<li class="has-line-data" data-line-start="1340" data-line-end="1342"><strong>Soft deletion</strong>: Audit trail maintenance</li>
+</ul>
+<p class="has-line-data" data-line-start="1342" data-line-end="1343"><strong>Operational Security</strong></p>
+<p class="has-line-data" data-line-start="1344" data-line-end="1345"><strong>Monitoring &amp; Auditing</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1345" data-line-end="1346"><strong>Comprehensive audit logs</strong>: All authentication events recorded</li>
+<li class="has-line-data" data-line-start="1346" data-line-end="1347"><strong>Security event tracking</strong>: Failed logins, token revocations</li>
+<li class="has-line-data" data-line-start="1347" data-line-end="1349"><strong>Compliance readiness</strong>: GDPR, SOC2, ISO27001 support</li>
+</ul>
+<p class="has-line-data" data-line-start="1349" data-line-end="1350"><strong>Error Handling</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1350" data-line-end="1351"><strong>Generic error messages</strong>: Prevent information leakage</li>
+<li class="has-line-data" data-line-start="1351" data-line-end="1352"><strong>Structured error responses</strong>: Consistent API error format</li>
+<li class="has-line-data" data-line-start="1352" data-line-end="1354"><strong>Security event alerts</strong>: Suspicious activity detection</li>
+</ul>
+<hr>
+<p class="has-line-data" data-line-start="1356" data-line-end="1357"><strong>🎯 Conclusion</strong></p>
+<p class="has-line-data" data-line-start="1358" data-line-end="1359">This comprehensive Module 1 implementation provides:</p>
+<p class="has-line-data" data-line-start="1360" data-line-end="1361"><strong>✅ Core Authentication Features</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1361" data-line-end="1362">Username/password authentication</li>
+<li class="has-line-data" data-line-start="1362" data-line-end="1363">JWT-based stateless sessions</li>
+<li class="has-line-data" data-line-start="1363" data-line-end="1364">Multi-factor authentication (TOTP)</li>
+<li class="has-line-data" data-line-start="1364" data-line-end="1366">Secure password reset flow</li>
+</ul>
+<p class="has-line-data" data-line-start="1366" data-line-end="1367"><strong>✅ Identity Management</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1367" data-line-end="1368">User lifecycle management (create, read, update, disable)</li>
+<li class="has-line-data" data-line-start="1368" data-line-end="1369">Role-based access control (RBAC)</li>
+<li class="has-line-data" data-line-start="1369" data-line-end="1370">Employee identity correlation</li>
+<li class="has-line-data" data-line-start="1370" data-line-end="1372">System user provisioning</li>
+</ul>
+<p class="has-line-data" data-line-start="1372" data-line-end="1373"><strong>✅ Security Foundation</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1373" data-line-end="1374">Cryptographic password storage</li>
+<li class="has-line-data" data-line-start="1374" data-line-end="1375">Secure token management</li>
+<li class="has-line-data" data-line-start="1375" data-line-end="1376">Comprehensive audit logging</li>
+<li class="has-line-data" data-line-start="1376" data-line-end="1378">Rate limiting readiness</li>
+</ul>
+<p class="has-line-data" data-line-start="1378" data-line-end="1379"><strong>✅ Integration Ready</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1379" data-line-end="1380">Event-driven architecture</li>
+<li class="has-line-data" data-line-start="1380" data-line-end="1381">RESTful API design</li>
+<li class="has-line-data" data-line-start="1381" data-line-end="1382">Cross-module correlation</li>
+<li class="has-line-data" data-line-start="1382" data-line-end="1384">External system integration points</li>
+</ul>
+<p class="has-line-data" data-line-start="1384" data-line-end="1385"><strong>✅ Production Ready</strong></p>
+<ul>
+<li class="has-line-data" data-line-start="1385" data-line-end="1386">Database schema with indexes</li>
+<li class="has-line-data" data-line-start="1386" data-line-end="1387">Configuration management</li>
+<li class="has-line-data" data-line-start="1387" data-line-end="1388">Error handling</li>
+<li class="has-line-data" data-line-start="1388" data-line-end="1390">Security best practices</li>
+</ul>
+<p class="has-line-data" data-line-start="1390" data-line-end="1391">The module is designed to be <strong>secure by default</strong>, <strong>highly scalable</strong>, and <strong>easily maintainable</strong> while providing a solid foundation for the entire HRMS suite.</p>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script></body></html>
